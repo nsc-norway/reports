@@ -187,7 +187,7 @@ def main():
 
     run_dirs = [r
             for directory in RUN_STORAGES
-            for r in glob.glob(os.path.join(directory, "*"))
+            for r in glob.glob(os.path.join(directory, "*_*_*"))
             ] 
 
     for r in run_dirs:
