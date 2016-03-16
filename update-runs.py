@@ -191,7 +191,7 @@ def main():
     lims_runs_id_cycle = dict((r[0], [r[2], int(r[3])]) for r in run_db if r[1].strip() == "LIMS")
 
     # Checks if any runs are missing
-    missing_runs = set(completed_runs) + set(lims_run_id_cycle.keys()) + set(new_runs)
+    missing_runs = set(completed_runs) | set(lims_runs_id_cycle.keys()) | set(new_runs)
 
     run_dirs = [r
             for directory in RUN_STORAGES
