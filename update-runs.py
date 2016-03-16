@@ -104,14 +104,14 @@ def get_lane_q30(df, lane, cycle_start, cycle_end):
 
 def hiseq_lane_q30(run_dir, dataset, process):
     lanes = process.all_inputs(resolve=True)
-    reads = 2 if process.udf.get('Read 2 Cycles') is None else 1
+    reads = 1 if process.udf.get('Read 2 Cycles') is None else 2
     do_update = True
     for lane in lanes:
         if lane.udf.get('Yield PF (Gb) R%d' % reads) is None:
             do_update = False
     if do_update:
         read_thresholds = [
-            (1, process.udf['Read 1 Cycles'])
+            (1, 1 + process.udf['Read 1 Cycles'])
             ]
         if reads == 2:
             r2start = sum([1,
@@ -190,8 +190,8 @@ def main():
     completed_runs = set(r[0] for r in run_db if r[1].strip() == "COMPLETED")
     lims_runs_id_cycle = dict((r[0], [r[2], int(r[3])]) for r in run_db if r[1].strip() == "LIMS")
 
-    # Checks if any "done" runs are missing
-    missing_completed_runs = set(completed_runs)
+    # Checks if any runs are missing
+    missing_runs = set(completed_runs) + set(lims_run_id_cycle.keys()) + set(new_runs)
 
     run_dirs = [r
             for directory in RUN_STORAGES
@@ -204,8 +204,7 @@ def main():
         if not re.match(RUN_ID_MATCH, run_id):
             continue
 
-        if run_id in missing_completed_runs:
-            missing_completed_runs.remove(run_id)
+        missing_runs.discard(run_id)
 
         if not (run_id in new_runs or lims_runs_id_cycle.has_key(run_id) or run_id in completed_runs):
             if os.path.isdir(r) and os.path.isdir(os.path.join(r, "InterOp")):
@@ -272,7 +271,10 @@ def main():
         p.put() # Again, batch not supported
     #lims.put_batch(updated_processes)
 
-    completed_runs -= missing_completed_runs
+    completed_runs -= missing_runs
+    new_runs -= missing_runs
+    for r in missing_runs:
+        lims_runs_id_cycle.pop(r)
 
     with open(DB_FILE, "w") as f:
         for r in new_runs:
