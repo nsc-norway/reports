@@ -92,13 +92,21 @@ def get_qm(dataset):
     return qm
 
 def get_lane_q30(df, lane, cycle_start, cycle_end):
-    qs = df[df.lane==lane and df.cycle >= cycle_start and df.cycle < cycle_end].sum()
+    global qs
+    global moo
+    moo = df
+    qs = df[(df.lane==lane) & (df.cycle >= cycle_start) & (df.cycle < cycle_end)].sum()
+    q30 = qs[("q%d" % (q) for q in range(30, 51))].sum()
+    qall = qs.sum()
+    if qall == 0.0:
+        return 0.0
+    return q30 * 100.0 / qall
 
 def hiseq_lane_q30(run_dir, dataset, process):
     lanes = process.all_inputs(resolve=True)
     reads = 2 if process.udf.get('Read 2 Cycles') is None else 1
     do_update = True
-    for l in lanes:
+    for lane in lanes:
         if lane.udf.get('Yield PF (Gb) R%d' % reads) is None:
             do_update = False
     if do_update:
@@ -113,11 +121,11 @@ def hiseq_lane_q30(run_dir, dataset, process):
                     ])
             read_thresholds.append((r2start, r2start + process.udf['Read 2 Cycles']))
         qm = get_qm(dataset)
-        for l in lanes:
+        for lane in lanes:
             for read_index, (start_cycle, end_cycle) in zip( (1,2), read_thresholds ):
-                lane_number = int(l.location[1].split(":")[0])
-                q30pct = get_lane_q30(df, lane_number, start_cycle, end_cycle)
-                l.udf['%% Bases >=Q30 R%d' % read_index] = q30pct
+                lane_number = int(lane.location[1].split(":")[0])
+                q30pct = get_lane_q30(qm.df, lane_number, start_cycle, end_cycle)
+                lane.udf['%% Bases >=Q30 R%d' % read_index] = q30pct
 
         lims.put_batch(lanes)
 
@@ -241,7 +249,7 @@ def main():
             if process.udf.get('Finish Date'):
                 mark_completed = True
                 if process.type.name.startswith("Illumina Sequencing"): # HiSeq
-                    mark_completed = False # TODO enable tomorrow # hiseq_lane_q30(r, ds, process)
+                    mark_completed = hiseq_lane_q30(r, ds, process)
                 if mark_completed:
                     completed_runs.add(run_id)
                     del lims_runs_id_cycle[run_id]
