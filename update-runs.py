@@ -236,7 +236,6 @@ def main():
     # Update LIMS state runs
     # Batch request for process objects not supported
     ## lims.get_batch([Process(lims, id=id) for (id, cycles) in lims_runs_id_cycle.values()])
-    updated_processes = set()
     for r in run_dirs:
         run_id = os.path.basename(r)
         if lims_runs_id_cycle.has_key(run_id):
@@ -263,18 +262,16 @@ def main():
                         if old_cycle == -1:
                             set_run_metadata(ds, r, process)
                         update_clusters_pf(ds, process, current_cycle)
-                        updated_processes.add(process)
+                        process.get(force=True)
+                        if not process.udf.get('Finish Date'): # Another work-around for race condition
+                            process.put()
                     else: # HiSeq: do nothing! Clarity does its job.
                         pass
-
-    for p in updated_processes:
-        p.put() # Again, batch not supported
-    #lims.put_batch(updated_processes)
 
     completed_runs -= missing_runs
     new_runs -= missing_runs
     for r in missing_runs:
-        lims_runs_id_cycle.pop(r)
+        lims_runs_id_cycle.pop(r, None)
 
     with open(DB_FILE, "w") as f:
         for r in new_runs:
