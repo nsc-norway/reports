@@ -137,16 +137,21 @@ def update_clusters_pf(ds, process, current_cycle):
     except ValueError:
         return # No information yet
     df = all_df[all_df.code == 103] # Number of clusters PF
-    clusters = df.value.sum()
     r1cycles = process.udf['Read 1 Cycles']
     reads = 1
     if current_cycle > r1cycles:
         reads = 2
 
-    lane = process.all_inputs()[0]
-    for i_read in range(1, reads+1):
-        lane.udf['Clusters PF R%d' % i_read] = clusters
-    lane.put()
+    lanes = process.all_inputs(resolve=True)
+    for lane_ana in lanes:
+        lane_str = lane_ana.location[1].split(":")[0]
+        if lane_str == "A":
+            lane = 1
+        else: 
+            lane = int(lane_str)
+        clusters = df[df.lane == lane].value.sum()
+        lane_ana.udf['Clusters PF R%d' % i_read] = clusters
+    lims.put_batch(lanes)
 
 def get_cycle(dataset, run_dir, lower_bound_cycle):
     """Get total cycles and current cycle based on files written in the run folder. 
