@@ -148,22 +148,21 @@ def update_clusters_pf(ds, process, current_cycle):
         lane.udf['Clusters PF R%d' % i_read] = clusters
     lane.put()
 
-def get_cycle(dataset, run_dir):
-    # Extraction metrics is the smallest binary file which still 
-    # contains the cycle number (?)
+def get_cycle(dataset, run_dir, lower_bound_cycle):
+    """Get total cycles and current cycle based on files written in the run folder. 
+
+    Will look at lane 1 only, to reduce I/O and complexity.
+    """
 
     total_cycles = sum(r['cycles'] for r in dataset.Metadata().read_config)
+    
+    lower_bound_cycle = max(0, lower_bound_cycle)
+    for cycle in range(lower_bound_cycle, total_cycles):
+        test_path = os.path.join(run_dir, "Data", "Intensities", "BaseCalls", "L001", "C{0}.1" % (cycle+1))
+        if not os.path.exists(test_path):
+            return cycle, total_cycles
 
-    try:
-        df = dataset.ExtractionMetrics().df
-    except ValueError:
-        return 0, total_cycles
-
-    if len(df) > 0:
-        cycle = max(df.cycle)
-    else:
-        cycle = 0
-    return cycle, total_cycles
+    return total_cycles, total_cycles
 
 
 def set_run_metadata(ds, run_dir, process):
@@ -252,7 +251,7 @@ def main():
                     completed_runs.add(run_id)
                     del lims_runs_id_cycle[run_id]
             else:
-                current_cycle, total_cycles = get_cycle(ds, r)
+                current_cycle, total_cycles = get_cycle(ds, r, old_cycle)
                 lims_runs_id_cycle[run_id][1] = current_cycle
                 if current_cycle is not None and current_cycle != old_cycle:
                     if re.match(r"\d\d\d\d\d\d_(N|M)[A-Z0-9\-_]+", run_id) and current_cycle != total_cycles:
