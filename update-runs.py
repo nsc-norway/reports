@@ -149,7 +149,10 @@ def update_clusters_pf(ds, process, current_cycle):
             lane = 1
         else: 
             lane = int(lane_str)
-        clusters = df[df.lane == lane].value.sum()
+        if len(lanes) > 0:
+            clusters = df[df.lane == lane].value.sum()
+        else:
+            clusters = df.sum()
         for i_read in range(1, reads+1):
             lane_ana.udf['Clusters PF R%d' % i_read] = clusters
     lims.put_batch(lanes)
@@ -164,8 +167,17 @@ def get_cycle(dataset, run_dir, lower_bound_cycle):
     
     lower_bound_cycle = max(0, lower_bound_cycle)
     for cycle in range(lower_bound_cycle, total_cycles):
-        test_path = os.path.join(run_dir, "Data", "Intensities", "BaseCalls", "L001", "C{0}.1".format(cycle+1))
-        if not os.path.exists(test_path):
+        test_paths = [
+                os.path.join(
+                    run_dir, "Data", "Intensities", "BaseCalls", "L001",
+                    "C{0}.1".format(cycle+1)
+                ),
+                os.path.join(
+                    run_dir, "Data", "Intensities", "BaseCalls", "L001",
+                    "{0:04d}.bcl.bgzf".format(cycle+1)
+                )
+            ]
+        if not any(os.path.exists(test_path) for test_path in test_paths):
             return cycle, total_cycles
 
     return total_cycles, total_cycles
@@ -263,10 +275,12 @@ def main():
                     if re.match(r"\d\d\d\d\d\d_(N|M)[A-Z0-9\-_]+", run_id) and current_cycle != total_cycles:
                         # Update all except last cycle for NextSeq (avoid race with clarity 
                         # integrations for last cycle)
+                        if old_cycle == -1:
+                            process.get()
+                            set_run_metadata(ds, r, process)
+                            process.put()
                         update_clusters_pf(ds, process, current_cycle)
                         process.get(force=True)
-                        if old_cycle == -1:
-                            set_run_metadata(ds, r, process)
                         process.udf['Status'] = "Cycle %d of %d" % (current_cycle, total_cycles)
                         if not process.udf.get('Finish Date'): # Another work-around for race condition
                             process.put()
