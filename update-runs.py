@@ -163,7 +163,7 @@ def get_cycle(dataset, run_dir, lower_bound_cycle):
     
     lower_bound_cycle = max(0, lower_bound_cycle)
     for cycle in range(lower_bound_cycle, total_cycles):
-        test_path = os.path.join(run_dir, "Data", "Intensities", "BaseCalls", "L001", "C{0}.1" % (cycle+1))
+        test_path = os.path.join(run_dir, "Data", "Intensities", "BaseCalls", "L001", "C{0}.1".format(cycle+1))
         if not os.path.exists(test_path):
             return cycle, total_cycles
 
