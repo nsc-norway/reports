@@ -150,7 +150,8 @@ def update_clusters_pf(ds, process, current_cycle):
         else: 
             lane = int(lane_str)
         clusters = df[df.lane == lane].value.sum()
-        lane_ana.udf['Clusters PF R%d' % i_read] = clusters
+        for i_read in range(1, reads+1):
+            lane_ana.udf['Clusters PF R%d' % i_read] = clusters
     lims.put_batch(lanes)
 
 def get_cycle(dataset, run_dir, lower_bound_cycle):
@@ -262,11 +263,11 @@ def main():
                     if re.match(r"\d\d\d\d\d\d_(N|M)[A-Z0-9\-_]+", run_id) and current_cycle != total_cycles:
                         # Update all except last cycle for NextSeq (avoid race with clarity 
                         # integrations for last cycle)
-                        process.udf['Status'] = "Cycle %d of %d" % (current_cycle, total_cycles)
-                        if old_cycle == -1:
-                            set_run_metadata(ds, r, process)
                         update_clusters_pf(ds, process, current_cycle)
                         process.get(force=True)
+                        if old_cycle == -1:
+                            set_run_metadata(ds, r, process)
+                        process.udf['Status'] = "Cycle %d of %d" % (current_cycle, total_cycles)
                         if not process.udf.get('Finish Date'): # Another work-around for race condition
                             process.put()
                     else: # HiSeq: do nothing! Clarity does its job.
