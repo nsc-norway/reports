@@ -272,7 +272,7 @@ def main():
                 current_cycle, total_cycles = get_cycle(ds, r, old_cycle)
                 lims_runs_id_cycle[run_id][1] = current_cycle
                 if current_cycle is not None and current_cycle != old_cycle:
-                    if re.match(r"\d\d\d\d\d\d_(N|M)[A-Z0-9\-_]+", run_id) and current_cycle != total_cycles:
+                    if re.match(r"\d\d\d\d\d\d_(N|M|70)[A-Z0-9\-_]+", run_id) and current_cycle != total_cycles:
                         # Update all except last cycle for NextSeq (avoid race with clarity 
                         # integrations for last cycle)
                         if old_cycle == -1:
