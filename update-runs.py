@@ -7,6 +7,7 @@ import glob
 import os
 import re
 import sys
+import datetime
 from xml.etree.ElementTree import ElementTree
 import xml.parsers.expat
 # MatPlotLib, required for use of Pandas DataFrame
@@ -284,8 +285,14 @@ def main():
                         process.udf['Status'] = "Cycle %d of %d" % (current_cycle, total_cycles)
                         if not process.udf.get('Finish Date'): # Another work-around for race condition
                             process.put()
-                    else: # HiSeq: do nothing! Clarity does its job.
-                        pass
+
+                    elif re.match(r"\d\d\d\d\d\d_(70|J)[A-Z0-9\-_]+", run_id) and current_cycle == total_cycles:
+                        # Pseudo integrations for some instruments
+                        if os.path.exists(os.path.join(r, "RTAComplete.txt")):
+                            process.get()
+                            process.udf['Status'] = "Cycle %d of %d" % (current_cycle, total_cycles)
+                            process.udf['Finish Date'] = datetime.date.today().strftime("%Y-%m-%d")
+                            process.put()
 
     completed_runs -= missing_runs
     new_runs -= missing_runs
