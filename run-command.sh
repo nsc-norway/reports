@@ -1,1 +1,1 @@
-psql -U clarity -d clarityDB -f get-sequencing-stats.sql 
+psql -AF"," -U clarity -d clarityDB -f get-sequencing-stats.sql 

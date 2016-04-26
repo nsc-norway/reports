@@ -1,8 +1,12 @@
 
 SELECT 
-	process_udf_view.udfvalue AS "Run ID",
+	MAX(CASE process_udf_view.udfname WHEN 'Run ID' THEN process_udf_view.udfvalue ELSE '' END) AS "Run ID",
 	project.name,
 	artifact.name,
+	MAX(CASE process_udf_view.udfname WHEN 'Read 1 Cycles' THEN process_udf_view.udfvalue ELSE '' END) AS "Read 1 Cycles",
+	MAX(CASE process_udf_view.udfname WHEN 'Read 2 Cycles' THEN process_udf_view.udfvalue ELSE '' END) AS "Read 2 Cycles",
+	MAX(CASE process_udf_view.udfname WHEN 'Index 1 Read Cycles' THEN process_udf_view.udfvalue ELSE '' END) AS "Index 1 Read Cycles",
+	MAX(CASE process_udf_view.udfname WHEN 'Index 2 Read Cycles' THEN process_udf_view.udfvalue ELSE '' END) AS "Index 2 Read Cycles",
 	MAX(CASE artifact_udf_view.udfname WHEN 'Yield PF (Gb) R1' THEN artifact_udf_view.udfvalue ELSE '' END) AS "Yield PF (Gb) R1",
 	MAX(CASE artifact_udf_view.udfname WHEN 'Yield PF (Gb) R2' THEN artifact_udf_view.udfvalue ELSE '' END) AS "Yield PF (Gb) R2",
 	MAX(CASE artifact_udf_view.udfname WHEN 'Avg Q Score R1' THEN artifact_udf_view.udfvalue ELSE '' END) AS "Avg Q Score R1",
@@ -28,10 +32,14 @@ SELECT
 	MAX(CASE artifact_udf_view.udfname WHEN '% Aligned R1' THEN artifact_udf_view.udfvalue ELSE '' END) AS "% Aligned R1",
 	MAX(CASE artifact_udf_view.udfname WHEN '% Aligned R2' THEN artifact_udf_view.udfvalue ELSE '' END) AS "% Aligned R2",
 	MAX(CASE artifact_udf_view.udfname WHEN '% Error Rate R1' THEN artifact_udf_view.udfvalue ELSE '' END) AS "% Error Rate R1",
-	MAX(CASE artifact_udf_view.udfname WHEN '% Error Rate R2' THEN artifact_udf_view.udfvalue ELSE '' END) AS "% Error Rate R2"
-FROM processtype, process, processiotracker, artifact, artifact_sample_map, sample, project, process_udf_view, artifact_udf_view
+	MAX(CASE artifact_udf_view.udfname WHEN '% Error Rate R2' THEN artifact_udf_view.udfvalue ELSE '' END) AS "% Error Rate R2",
+	artifactstate.qcflag
+
+FROM processtype, process, processiotracker, artifact, artifact_sample_map, sample, project, process_udf_view, artifact_udf_view, artifactstate
 WHERE
 	processtype.displayname='Illumina Sequencing (Illumina SBS) 5.0' AND
+	--processtype.displayname='MiSeq Run (MiSeq) 5.0' AND--
+	--processtype.displayname='NextSeq Run (NextSeq) 1.0' AND--
 	process.typeid=processtype.typeid AND
 	processiotracker.processid=process.processid AND
 	artifact.artifactid=processiotracker.inputartifactid AND
@@ -40,17 +48,10 @@ WHERE
 	artifact_sample_map.artifactid=artifact.artifactid AND
 	artifact_sample_map.processid=sample.processid AND
 	project.projectid=sample.projectid AND
-	process_udf_view.udfname='Run ID' AND
+	artifactstate.artifactid=artifact.artifactid AND
+	artifactstate.qcflag != 0
 
-	0 < (SELECT COUNT(*) FROM project project2, sample sample2, artifact_sample_map asm2, artifact artifact2, processiotracker processiotracker2
-		WHERE
-		processiotracker2.processid=process.processid AND
-		processiotracker2.inputartifactid=artifact2.artifactid AND
-		asm2.artifactid=artifact2.artifactid AND
-		asm2.processid=sample2.processid AND
-		project2.projectid=sample2.projectid AND
-		UPPER(project2.name) LIKE 'DIAG%')
+	GROUP BY process.processid, artifact.artifactid, artifact.name, project.name, artifact_sample_map.artifactid, artifactstate.qcflag
+	ORDER BY "Run ID"
 
-	GROUP BY process.processid, artifact.artifactid, process_udf_view.udfvalue, artifact.name, project.name
-	ORDER BY process_udf_view.udfvalue
 
