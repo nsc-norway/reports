@@ -288,7 +288,7 @@ def main():
                         if not process.udf.get('Finish Date'): # Another work-around for race condition
                             process.put()
 
-                    elif re.match(r"\d\d\d\d\d\d_(70|J|E)[A-Z0-9\-_]+", run_id) and current_cycle == total_cycles:
+                    if re.match(r"\d\d\d\d\d\d_(70|J|E)[A-Z0-9\-_]+", run_id) and current_cycle == total_cycles:
                         # Pseudo integrations for some instruments
                         if os.path.exists(os.path.join(r, "RTAComplete.txt")):
                             process.get()
