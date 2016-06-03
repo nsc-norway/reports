@@ -274,8 +274,8 @@ def main():
             else:
                 current_cycle, total_cycles = get_cycle(ds, r, old_cycle)
                 lims_runs_id_cycle[run_id][1] = current_cycle
-                if current_cycle is not None and current_cycle != old_cycle:
-                    if re.match(r"\d\d\d\d\d\d_(N|M|70|J|E)[A-Z0-9\-_]+", run_id) and current_cycle != total_cycles:
+                if current_cycle is not None:
+                    if re.match(r"\d\d\d\d\d\d_(N|M|J|K|E)[A-Z0-9\-_]+", run_id) and current_cycle != total_cycles:
                         # Update all except last cycle for NextSeq (avoid race with clarity 
                         # integrations for last cycle)
                         if old_cycle == -1:
@@ -288,7 +288,7 @@ def main():
                         if not process.udf.get('Finish Date'): # Another work-around for race condition
                             process.put()
 
-                    if re.match(r"\d\d\d\d\d\d_(70|J|E)[A-Z0-9\-_]+", run_id) and current_cycle == total_cycles:
+                    if re.match(r"\d\d\d\d\d\d_(J|E)[A-Z0-9\-_]+", run_id) and current_cycle == total_cycles:
                         # Pseudo integrations for some instruments
                         if os.path.exists(os.path.join(r, "RTAComplete.txt")):
                             process.get()
