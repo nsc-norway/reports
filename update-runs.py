@@ -266,8 +266,9 @@ def main():
             # Completed run
             if process.udf.get('Finish Date'):
                 mark_completed = True
-                if process.type.name.startswith("Illumina Sequencing"): # HiSeq 2500/3000/X
-                    mark_completed = hiseq_lane_q30(r, ds, process)
+                ## Q30 not needed, done by lims integrations now !
+                ## if process.type.name.startswith("Illumina Sequencing"): # HiSeq 2500/3000/X
+                ##     mark_completed = hiseq_lane_q30(r, ds, process)
                 if mark_completed:
                     completed_runs.add(run_id)
                     del lims_runs_id_cycle[run_id]
@@ -275,7 +276,7 @@ def main():
                 current_cycle, total_cycles = get_cycle(ds, r, old_cycle)
                 lims_runs_id_cycle[run_id][1] = current_cycle
                 if current_cycle is not None:
-                    if re.match(r"\d\d\d\d\d\d_(N|M|J|K|E)[A-Z0-9\-_]+", run_id) and current_cycle != total_cycles:
+                    if re.match(r"\d\d\d\d\d\d_(N|M)[A-Z0-9\-_]+", run_id) and current_cycle != total_cycles:
                         # Update all except last cycle for NextSeq (avoid race with clarity 
                         # integrations for last cycle)
                         if old_cycle == -1:
@@ -288,13 +289,14 @@ def main():
                         if not process.udf.get('Finish Date'): # Another work-around for race condition
                             process.put()
 
-                    if re.match(r"\d\d\d\d\d\d_(J|E)[A-Z0-9\-_]+", run_id) and current_cycle == total_cycles:
-                        # Pseudo integrations for some instruments
-                        if os.path.exists(os.path.join(r, "RTAComplete.txt")):
-                            process.get()
-                            process.udf['Status'] = "Cycle %d of %d" % (current_cycle, total_cycles)
-                            process.udf['Finish Date'] = datetime.date.today().strftime("%Y-%m-%d")
-                            process.put()
+                    # No longer needed, properly integrated!
+                    #if re.match(r"\d\d\d\d\d\d_(J|E)[A-Z0-9\-_]+", run_id) and current_cycle == total_cycles:
+                    #    # Pseudo integrations for some instruments
+                    #    if os.path.exists(os.path.join(r, "RTAComplete.txt")):
+                    #        process.get()
+                    #        process.udf['Status'] = "Cycle %d of %d" % (current_cycle, total_cycles)
+                    #        process.udf['Finish Date'] = datetime.date.today().strftime("%Y-%m-%d")
+                    #        process.put()
 
     completed_runs -= missing_runs
     new_runs -= missing_runs
