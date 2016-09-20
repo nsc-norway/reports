@@ -6,9 +6,9 @@ import datetime
 import subprocess
 from collections import defaultdict
 
-RUN_PARAMETERS = "/data/nsc.loki/scripts/lims/getinfo/run-parameters.py"
+RUN_PARAMETERS = "../run-parameters.py"
 
-cols = ['jobid', 'jobname', 'start', 'end', 'comment', 'ncpus']
+cols = ['jobid', 'jobname', 'start', 'end', 'comment', 'ncpus', 'node']
 c = dict((v, i) for i, v in enumerate(cols))
 
 def get_instrument_by_runid(run_id):
@@ -23,7 +23,7 @@ def get_instrument_by_runid(run_id):
 
 sacct_args = [
         "/usr/bin/sacct", "-u", "seq-user", "-P",
-        "-S", "0701",  "-o", ",".join(cols), 
+        "-S", "0101",  "-o", ",".join(cols), 
         "-s", "COMPLETED"
         ]
 try:
@@ -46,12 +46,15 @@ for row in table:
         time = end - start
         cpus = float(row[c['ncpus']])
 
-        if row[c['comment']] and cpus == 16:
-            runinfo = dict(
-                    (line.split('|'))
-                    for line in 
-                    subprocess.check_output(["python", RUN_PARAMETERS, '-p', row[c['comment']]]).splitlines()
-                    )
+        if row[c['comment']]:# and cpus == 16:
+            try:
+                runinfo = dict(
+                        (line.split('|'))
+                        for line in 
+                        subprocess.check_output(["python", RUN_PARAMETERS, '-p', row[c['comment']]]).splitlines()
+                        )
+            except subprocess.CalledProcessError:
+                continue
             cycles = [
                     runinfo.get('Read 1 Cycles', "0"),
                     runinfo.get('Read 2 Cycles', "0")
@@ -61,10 +64,10 @@ for row in table:
             if "Rapid" in runinfo.get("Flow Cell Version", ""):
                 instrument += "rapid"
 
-            key = "_".join([instrument] + cycles)
-            cpu_hours = time.total_seconds()  / 3600.0
+            key = "_".join([row[c['node']], instrument] + cycles)
+            cpu_hours = cpus * time.total_seconds()  / 3600.0
             run_type_cpuhrs[key].append(cpu_hours)
-            minutes = time.total_seconds() / 60.0
+            minutes = cpus * time.total_seconds() / 60.0
             run_type_mins[key].append(minutes)
 
 for key in sorted(run_type_cpuhrs.keys()):
