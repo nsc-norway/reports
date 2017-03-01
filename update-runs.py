@@ -252,6 +252,8 @@ def main():
                     if set(process.all_inputs()) == set(lims_containers[-1].placements.values()):
                         new_runs.remove(run_id)
                         lims_runs_id_cycle[run_id] = [process.id, -1] # Trigger update 
+			if "HiSeq" in process.type_name:
+                            set_hiseq_reagents(process)
 
     # Update LIMS state runs
     # Batch request for process objects not supported
@@ -261,42 +263,30 @@ def main():
         if lims_runs_id_cycle.has_key(run_id):
             process_id, old_cycle = lims_runs_id_cycle[run_id]
             process = Process(lims, id=process_id)
-            ds = InteropDataset(r)
 
             # Completed run
             if process.udf.get('Finish Date'):
-                mark_completed = True
-                ## Q30 not needed, done by lims integrations now !
-                #if process.type.name.startswith("Illumina Sequencing (HiSeq"): # HiSeq 3000/X
-                #    mark_completed = hiseq_lane_q30(r, ds, process)
-                if mark_completed:
-                    completed_runs.add(run_id)
-                    del lims_runs_id_cycle[run_id]
+                completed_runs.add(run_id)
+                del lims_runs_id_cycle[run_id]
             else:
-                current_cycle, total_cycles = get_cycle(ds, r, old_cycle)
-                lims_runs_id_cycle[run_id][1] = current_cycle
-                if current_cycle is not None:
-                    if re.match(r"\d\d\d\d\d\d_(N|M)[A-Z0-9\-_]+", run_id) and current_cycle != total_cycles:
-                        # Update all except last cycle for NextSeq (avoid race with clarity 
-                        # integrations for last cycle)
-                        if old_cycle == -1:
-                            process.get()
-                            set_run_metadata(ds, r, process)
-                            process.put()
-                        update_clusters_pf(ds, process, current_cycle)
-                        process.get(force=True)
-                        process.udf['Status'] = "Cycle %d of %d" % (current_cycle, total_cycles)
-                        if not process.udf.get('Finish Date'): # Another work-around for race condition
-                            process.put()
-
-                    # No longer needed, properly integrated!
-                    #if re.match(r"\d\d\d\d\d\d_(J|E)[A-Z0-9\-_]+", run_id) and current_cycle == total_cycles:
-                    #    # Pseudo integrations for some instruments
-                    #    if os.path.exists(os.path.join(r, "RTAComplete.txt")):
-                    #        process.get()
-                    #        process.udf['Status'] = "Cycle %d of %d" % (current_cycle, total_cycles)
-                    #        process.udf['Finish Date'] = datetime.date.today().strftime("%Y-%m-%d")
-                    #        process.put()
+                miseq_or_nextseq = re.match(r"\d\d\d\d\d\d_(N|M)[A-Z0-9\-_]+", run_id)
+                if miseq_or_nextseq:
+                    ds = InteropDataset(r)
+                    current_cycle, total_cycles = get_cycle(ds, r, old_cycle)
+                    lims_runs_id_cycle[run_id][1] = current_cycle
+                    if current_cycle is not None:
+                        if current_cycle != total_cycles:
+                            # Update all except last cycle for NextSeq (avoid race with clarity 
+                            # integrations for last cycle)
+                            if old_cycle == -1:
+                                process.get()
+                                set_run_metadata(ds, r, process)
+                                process.put()
+                            update_clusters_pf(ds, process, current_cycle)
+                            process.get(force=True)
+                            process.udf['Status'] = "Cycle %d of %d" % (current_cycle, total_cycles)
+                            if not process.udf.get('Finish Date'): # Another work-around for race condition
+                                process.put()
 
     completed_runs -= missing_runs
     new_runs -= missing_runs
@@ -311,7 +301,43 @@ def main():
         for r in completed_runs:
             f.write("{0}\tCOMPLETED\n".format(r))
 
+def set_hiseq_reagents(process):
+    step = Step(lims, id=process.id)
+    run_id = process.udf.get('Run ID', 'Unknown')
+    lots = step.reagentlots.reagent_lots
+    if len(lots) > 0:
+        return # Some lots are already set
+    kits = step.configuration.required_reagent_kits
+
+    sbs_lots_val = process.udf.get('SBS Kit Lot #', '')
+    sbs_lots = [part.strip() for part in sbs_lots_val.split(",")]
+    if len(sbs_lots) != 2:
+        print "Invalid SBS lots '" + sbs_lots_val + "' for run:", 
+        return
+    set_lots = []
+    for kit in kits:
+        if kit.name.endswith("SBS Reagents 1/2"):
+            rgts = sbs_lots
+        elif kit.name.endswith("SBS Reagents 2/2"):
+            rgts = reversed(sbs_lots)
+        else:
+            rgts = [process.udf.get("Flow Cell ID", "UNKNOWN_FLOWCELL")]
+        found = False
+        for rgt in rgts:
+            lots = [lot for lot in lims.get_reagent_lots(kitname=kit.name) if lot.name.startswith(rgt) and lot.status == "ACTIVE"]
+            if len(lots) > 1:
+                print "Multiple lots match for kit", kit.name, ", ID", rgt, ", run ID", run_id
+                return
+            elif len(lots) == 1:
+                set_lots.append(lots[0])
+                found = True
+        if not found:
+            print "No lots found for kit", kit.name, ", ID", " or ".join(rgts), ", run ID", run_id
+            return
+    step.reagentlots.set_reagent_lots(set_lots)
+    print "Set lots for run", run_id
 
 
 if __name__ == "__main__":
     main()
+
